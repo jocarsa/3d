@@ -1,60 +1,36 @@
-*{
-    box-sizing:border-box;
-}
-
-html,
-body{
-    margin:0;
-    min-height:100%;
-}
-
-body{
-    overflow:hidden;
-    perspective:1200px;
-    perspective-origin:center center;
+.jocarsa-3d-viewport{
+    position:relative;
+    width:100%;
+    min-height:100vh;
+    perspective:900px;
+    perspective-origin:50% 50%;
 }
 
 .jocarsa-3d-scene{
-    width:100vw;
-    min-height:100vh;
+    position:relative;
     transform-style:preserve-3d;
     transform-origin:center center;
+    will-change:transform;
 }
 
 .jocarsa-3d-box{
-    position:relative;
     transform-style:preserve-3d;
-    overflow:visible;
-    max-width:100%;
-}
-
-.jocarsa-3d-content{
-    position:relative;
-    z-index:2;
-    width:100%;
-    max-width:100%;
-    overflow:hidden;
-    transform-style:preserve-3d;
+    will-change:transform,box-shadow;
 }
 
 .jocarsa-3d-text{
-    max-width:100%;
-}
-
-img.jocarsa-3d-box{
-    display:block;
-    max-width:100%;
+    will-change:text-shadow;
 }
 
 .jocarsa-3d-debug{
     position:absolute;
-    top:8px;
-    right:8px;
+    top:6px;
+    right:6px;
     z-index:99999;
-    background:rgba(0,0,0,.25);
+    background:rgba(0,0,0,.35);
     color:white;
-    padding:5px 8px;
-    border-radius:7px;
+    padding:4px 7px;
+    border-radius:6px;
     font:11px monospace;
     pointer-events:none;
 }

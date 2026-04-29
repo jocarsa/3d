@@ -1,284 +1,268 @@
 (function(){
 
-    const CONFIG = {
-        scene: "body",
+const CONFIG = {
+    scene:"body",
 
-        boxSelector: `
-            header, nav, main, section, article, aside, footer,
-            div, form, figure, blockquote, ul, ol, li,
-            img, button, input, textarea, select
-        `,
+    boxSelector:`
+        header,nav,main,section,article,aside,footer,
+        div,form,figure,blockquote,ul,ol,li,
+        img,button,input,textarea,select
+    `,
 
-        textSelector: `
-            h1,h2,h3,h4,h5,h6,p,span,a,label,figcaption,button,li
-        `,
+    textSelector:`
+        h1,h2,h3,h4,h5,h6,p,span,a,label,figcaption,button,li
+    `,
 
-        cameraZ: -520,
-        scale: 0.66,
+    cameraZ:-360,
+    scale:0.82,
+    perspective:900,
 
-        rotationStrength: 15,
+    rotationStrength:16,
 
-        depthStep: 42,
-        contentDepth: 24,
-        maxDepth: 420,
+    depthStep:34,
+    maxDepth:360,
 
-        thicknessBase: 9,
-        thicknessPerDepth: 3,
-        thicknessStep: 0.9,
+    thicknessBase:6,
+    thicknessPerDepth:1.6,
+    thicknessStep:0.55,
 
-        textLayers: 7,
-        textStep: 0.42,
+    textLayers:5,
+    textStep:0.34,
 
-        directionStrength: 5.5,
+    directionStrength:5.5,
 
-        debug: false
+    debug:false
+};
+
+function params(){
+    const s = document.currentScript;
+    if(!s) return {};
+
+    const url = new URL(s.src);
+    const out = {};
+
+    url.searchParams.forEach((v,k)=>{
+        if(v === "true") out[k] = true;
+        else if(v === "false") out[k] = false;
+        else if(!isNaN(v)) out[k] = Number(v);
+        else out[k] = v;
+    });
+
+    return out;
+}
+
+function rgb(color){
+    const v = color.match(/\d+/g);
+    if(!v) return {r:180,g:180,b:180};
+
+    return {
+        r:Number(v[0]),
+        g:Number(v[1]),
+        b:Number(v[2])
+    };
+}
+
+function darken(c,f){
+    return {
+        r:Math.max(0,Math.round(c.r*f)),
+        g:Math.max(0,Math.round(c.g*f)),
+        b:Math.max(0,Math.round(c.b*f))
+    };
+}
+
+function visible(el){
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+}
+
+function depthOf(el,root){
+    let d = 0;
+    let p = el.parentElement;
+
+    while(p && p !== root && p !== document.body){
+        d++;
+        p = p.parentElement;
+    }
+
+    return d;
+}
+
+function baseColor(el){
+    const st = getComputedStyle(el);
+    let c = st.backgroundColor;
+
+    if(c === "rgba(0, 0, 0, 0)" || c === "transparent"){
+        c = st.color;
+    }
+
+    return rgb(c);
+}
+
+function textShadow(el,dx,dy,cfg){
+    const shadows = [];
+
+    for(let i=1;i<=cfg.textLayers;i++){
+        shadows.push(`
+            ${dx*i*cfg.textStep}px
+            ${dy*i*cfg.textStep}px
+            0
+            rgba(0,0,0,${0.34 - i*0.04})
+        `);
+    }
+
+    shadows.push(`
+        ${dx*2}px
+        ${dy*2}px
+        7px
+        rgba(0,0,0,.18)
+    `);
+
+    el.style.textShadow = shadows.join(",");
+}
+
+function boxShadow(el,dx,dy,cfg){
+    const depth = Number(el.dataset.jocarsaDepth || 0);
+
+    const c = {
+        r:Number(el.dataset.jocarsaR),
+        g:Number(el.dataset.jocarsaG),
+        b:Number(el.dataset.jocarsaB)
     };
 
-    function getScriptParams(){
-        const script = document.currentScript;
-        if(!script) return {};
+    const layers = Math.round(
+        cfg.thicknessBase + depth * cfg.thicknessPerDepth
+    );
 
-        const url = new URL(script.src);
-        const params = {};
+    const shadows = [];
 
-        url.searchParams.forEach((value,key)=>{
-            if(value === "true") params[key] = true;
-            else if(value === "false") params[key] = false;
-            else if(!isNaN(value)) params[key] = Number(value);
-            else params[key] = value;
-        });
-
-        return params;
-    }
-
-    function rgbFromCss(color){
-        const v = color.match(/\d+/g);
-
-        if(!v){
-            return {r:180,g:180,b:180};
-        }
-
-        return {
-            r:Number(v[0]),
-            g:Number(v[1]),
-            b:Number(v[2])
-        };
-    }
-
-    function darken(rgb,f){
-        return {
-            r:Math.max(0,Math.round(rgb.r*f)),
-            g:Math.max(0,Math.round(rgb.g*f)),
-            b:Math.max(0,Math.round(rgb.b*f))
-        };
-    }
-
-    function getBaseColor(el){
-        const st = getComputedStyle(el);
-        let color = st.backgroundColor;
-
-        if(color === "rgba(0, 0, 0, 0)" || color === "transparent"){
-            color = st.color;
-        }
-
-        return rgbFromCss(color);
-    }
-
-    function isVisible(el){
-        const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-    }
-
-    function depthOf(el,root){
-        let depth = 0;
-        let current = el.parentElement;
-
-        while(current && current !== root && current !== document.body){
-            depth++;
-            current = current.parentElement;
-        }
-
-        return depth;
-    }
-
-    function wrapContent(el,config){
-
-        if(["IMG","INPUT","TEXTAREA","SELECT","BUTTON"].includes(el.tagName)){
-            return;
-        }
-
-        if(
-            el.children.length === 1 &&
-            el.children[0].classList.contains("jocarsa-3d-content")
-        ){
-            return;
-        }
-
-        const wrapper = document.createElement("div");
-        wrapper.className = "jocarsa-3d-content";
-
-        while(el.firstChild){
-            wrapper.appendChild(el.firstChild);
-        }
-
-        el.appendChild(wrapper);
-
-        wrapper.style.transform =
-            `translateZ(${config.contentDepth}px)`;
-    }
-
-    function boxShadow(el,dirX,dirY,config){
-
-        const depth = Number(el.dataset.jocarsaDepth || 0);
-
-        const base = {
-            r:Number(el.dataset.jocarsaR),
-            g:Number(el.dataset.jocarsaG),
-            b:Number(el.dataset.jocarsaB)
-        };
-
-        const layers =
-            config.thicknessBase + depth * config.thicknessPerDepth;
-
-        const shadows = [];
-
-        for(let i=1;i<=layers;i++){
-            const c = darken(base,1 - i * 0.025);
-
-            shadows.push(`
-                ${dirX * i * config.thicknessStep}px
-                ${dirY * i * config.thicknessStep}px
-                0
-                rgb(${c.r},${c.g},${c.b})
-            `);
-        }
+    for(let i=1;i<=layers;i++){
+        const cc = darken(c,1 - i*0.025);
 
         shadows.push(`
-            ${dirX * layers * config.thicknessStep}px
-            ${dirY * layers * config.thicknessStep}px
-            16px
-            rgba(0,0,0,.16)
+            ${dx*i*cfg.thicknessStep}px
+            ${dy*i*cfg.thicknessStep}px
+            0
+            rgb(${cc.r},${cc.g},${cc.b})
         `);
-
-        el.style.boxShadow = shadows.join(",");
     }
 
-    function textShadow(el,dirX,dirY,config){
+    shadows.push(`
+        ${dx*layers*cfg.thicknessStep}px
+        ${dy*layers*cfg.thicknessStep}px
+        14px
+        rgba(0,0,0,.14)
+    `);
 
-        const shadows = [];
+    el.style.boxShadow = shadows.join(",");
+}
 
-        for(let i=1;i<=config.textLayers;i++){
-            shadows.push(`
-                ${dirX * i * config.textStep}px
-                ${dirY * i * config.textStep}px
-                0
-                rgba(0,0,0,${0.36 - i * 0.035})
-            `);
-        }
+function init(options = {}){
 
-        shadows.push(`
-            ${dirX * 3}px
-            ${dirY * 3}px
-            8px
-            rgba(0,0,0,.20)
-        `);
+    const cfg = {...CONFIG,...options};
+    const scene = document.querySelector(cfg.scene);
 
-        el.style.textShadow = shadows.join(",");
+    if(!scene){
+        console.warn("Jocarsa3D: escena no encontrada",cfg.scene);
+        return;
     }
 
-    function init(options = {}){
+    const viewport = document.createElement("div");
+    viewport.className = "jocarsa-3d-viewport";
 
-        const config = {
-            ...CONFIG,
-            ...options
-        };
+    scene.parentNode.insertBefore(viewport,scene);
+    viewport.appendChild(scene);
 
-        const root = document.querySelector(config.scene);
+    viewport.style.perspective = cfg.perspective + "px";
+    viewport.style.perspectiveOrigin = "50% 50%";
 
-        if(!root){
-            console.warn("Jocarsa3D: escena no encontrada:",config.scene);
-            return;
+    scene.classList.add("jocarsa-3d-scene");
+
+    const boxes = [...scene.querySelectorAll(cfg.boxSelector)]
+        .filter(el=>!el.classList.contains("jocarsa-3d-debug"))
+        .filter(el=>!el.closest(".jocarsa-3d-debug"))
+        .filter(visible);
+
+    const texts = [...scene.querySelectorAll(cfg.textSelector)]
+        .filter(visible);
+
+    boxes.forEach(el=>{
+
+        el.classList.add("jocarsa-3d-box");
+
+        const depth = depthOf(el,scene);
+        const z = Math.min(depth * cfg.depthStep,cfg.maxDepth);
+        const c = baseColor(el);
+
+        el.dataset.jocarsaDepth = depth;
+        el.dataset.jocarsaZ = z;
+        el.dataset.jocarsaR = c.r;
+        el.dataset.jocarsaG = c.g;
+        el.dataset.jocarsaB = c.b;
+
+        /*
+            No se toca display.
+            No se envuelve contenido.
+            No se modifica overflow.
+            No se cambia width.
+        */
+        el.style.transform =
+            (el.style.transform || "") + ` translateZ(${z}px)`;
+
+        if(cfg.debug){
+            const label = document.createElement("span");
+            label.className = "jocarsa-3d-debug";
+            label.textContent = `Z ${z}px`;
+            el.appendChild(label);
         }
-
-        root.classList.add("jocarsa-3d-scene");
-
-        const boxes = [...root.querySelectorAll(config.boxSelector)]
-            .filter(el => !el.classList.contains("jocarsa-3d-debug"))
-            .filter(el => !el.closest(".jocarsa-3d-debug"))
-            .filter(isVisible);
-
-        boxes.forEach(el=>{
-
-            el.classList.add("jocarsa-3d-box");
-
-            const depth = depthOf(el,root);
-            const z = Math.min(depth * config.depthStep,config.maxDepth);
-            const color = getBaseColor(el);
-
-            el.dataset.jocarsaDepth = depth;
-            el.dataset.jocarsaZ = z;
-            el.dataset.jocarsaR = color.r;
-            el.dataset.jocarsaG = color.g;
-            el.dataset.jocarsaB = color.b;
-
-            el.style.transform = `translateZ(${z}px)`;
-
-            wrapContent(el,config);
-
-            if(config.debug){
-                const label = document.createElement("div");
-                label.className = "jocarsa-3d-debug";
-                label.textContent = `Z ${z}px`;
-                el.appendChild(label);
-            }
-        });
-
-        const texts = [...root.querySelectorAll(config.textSelector)]
-            .filter(isVisible);
-
-        texts.forEach(el=>{
-            el.classList.add("jocarsa-3d-text");
-        });
-
-        function update(e){
-
-            const x = e.clientX / innerWidth - 0.5;
-            const y = e.clientY / innerHeight - 0.5;
-
-            const rotY = x * config.rotationStrength;
-            const rotX = -y * config.rotationStrength;
-
-            root.style.transform = `
-                translateZ(${config.cameraZ}px)
-                scale(${config.scale})
-                rotateX(${rotX}deg)
-                rotateY(${rotY}deg)
-            `;
-
-            const dirX =
-                -Math.sin(rotY * Math.PI / 180) *
-                config.directionStrength;
-
-            const dirY =
-                Math.sin(rotX * Math.PI / 180) *
-                config.directionStrength;
-
-            boxes.forEach(el=>boxShadow(el,dirX,dirY,config));
-            texts.forEach(el=>textShadow(el,dirX,dirY,config));
-        }
-
-        document.addEventListener("mousemove",update);
-
-        update({
-            clientX:innerWidth/2,
-            clientY:innerHeight/2
-        });
-    }
-
-    window.Jocarsa3D = init;
-
-    document.addEventListener("DOMContentLoaded",()=>{
-        init(getScriptParams());
     });
+
+    texts.forEach(el=>{
+        el.classList.add("jocarsa-3d-text");
+    });
+
+    function update(e){
+
+        const x = e.clientX / window.innerWidth - .5;
+        const y = e.clientY / window.innerHeight - .5;
+
+        const rotY = x * cfg.rotationStrength;
+        const rotX = -y * cfg.rotationStrength;
+
+        scene.style.transform = `
+            translateZ(${cfg.cameraZ}px)
+            scale(${cfg.scale})
+            rotateX(${rotX}deg)
+            rotateY(${rotY}deg)
+        `;
+
+        /*
+            Volumen ligado a la rotación.
+            No es una sombra fija ortográfica.
+        */
+        const dx =
+            -Math.sin(rotY * Math.PI / 180) *
+            cfg.directionStrength;
+
+        const dy =
+            Math.sin(rotX * Math.PI / 180) *
+            cfg.directionStrength;
+
+        boxes.forEach(el=>boxShadow(el,dx,dy,cfg));
+        texts.forEach(el=>textShadow(el,dx,dy,cfg));
+    }
+
+    document.addEventListener("mousemove",update);
+
+    update({
+        clientX:window.innerWidth/2,
+        clientY:window.innerHeight/2
+    });
+}
+
+window.Jocarsa3D = init;
+
+document.addEventListener("DOMContentLoaded",()=>{
+    init(params());
+});
 
 })();
