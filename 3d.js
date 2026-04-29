@@ -22,7 +22,7 @@
     autoFitWidth: true,
     perspective: 900,
 
-    rotationStrength: 14,
+    rotationStrength: 5,
 
     depthStep: 22,
     maxDepth: 240,
@@ -77,16 +77,13 @@
       });
 
       return out;
-
     } catch (_) {
       return {};
     }
   }
 
   function rgb(color) {
-    if (!color) {
-      return { r: 160, g: 160, b: 160 };
-    }
+    if (!color) return { r: 160, g: 160, b: 160 };
 
     const v = color.match(/\d+/g);
 
@@ -128,35 +125,44 @@
     return false;
   }
 
-  function getPageBackground() {
-
+  function getBackgroundSource() {
     const body = document.body;
     const html = document.documentElement;
 
-    const bodyStyle = body
-      ? getComputedStyle(body)
-      : null;
+    const bs = body ? getComputedStyle(body) : null;
+    const hs = html ? getComputedStyle(html) : null;
 
-    const htmlStyle = html
-      ? getComputedStyle(html)
-      : null;
+    if (bs && !isTransparent(bs.backgroundColor)) return bs;
+    if (bs && bs.backgroundImage && bs.backgroundImage !== "none") return bs;
 
-    const bodyBg = bodyStyle
-      ? bodyStyle.backgroundColor
-      : "";
+    if (hs && !isTransparent(hs.backgroundColor)) return hs;
+    if (hs && hs.backgroundImage && hs.backgroundImage !== "none") return hs;
 
-    const htmlBg = htmlStyle
-      ? htmlStyle.backgroundColor
-      : "";
+    return bs || hs;
+  }
 
-    if (!isTransparent(bodyBg)) return bodyBg;
-    if (!isTransparent(htmlBg)) return htmlBg;
+  function copyPageBackground(target) {
+    const src = getBackgroundSource();
 
-    return "#ffffff";
+    if (!src) {
+      target.style.background = "#ffffff";
+      return;
+    }
+
+    target.style.backgroundColor = isTransparent(src.backgroundColor)
+      ? "#ffffff"
+      : src.backgroundColor;
+
+    target.style.backgroundImage = src.backgroundImage;
+    target.style.backgroundSize = src.backgroundSize;
+    target.style.backgroundRepeat = src.backgroundRepeat;
+    target.style.backgroundPosition = src.backgroundPosition;
+    target.style.backgroundAttachment = src.backgroundAttachment;
+    target.style.backgroundOrigin = src.backgroundOrigin;
+    target.style.backgroundClip = src.backgroundClip;
   }
 
   function ownBackground(el) {
-
     const bg = getComputedStyle(el).backgroundColor;
 
     if (isTransparent(bg)) {
@@ -173,7 +179,6 @@
   }
 
   function visible(el) {
-
     const st = getComputedStyle(el);
 
     if (
@@ -189,7 +194,6 @@
   }
 
   function depthOf(el, root) {
-
     let d = 0;
     let p = el.parentElement;
 
@@ -210,23 +214,15 @@
   }
 
   function getNumericZIndex(el) {
-
-    const z = parseInt(
-      getComputedStyle(el).zIndex,
-      10
-    );
-
+    const z = parseInt(getComputedStyle(el).zIndex, 10);
     return isNaN(z) ? 0 : z;
   }
 
   function buildTextShadow(dx, dy, cfg) {
-
     const parts = [];
 
     for (let i = 1; i <= cfg.textLayers; i++) {
-
-      const alpha =
-        Math.max(0, 0.30 - i * 0.045).toFixed(3);
+      const alpha = Math.max(0, 0.30 - i * 0.045).toFixed(3);
 
       parts.push(
         `${(dx * i * cfg.textStep).toFixed(2)}px ` +
@@ -245,17 +241,14 @@
   }
 
   function buildBoxShadow(depth, c, dx, dy, cfg) {
-
-    const layers =
-      Math.round(
-        cfg.thicknessBase +
-        depth * cfg.thicknessPerDepth
-      );
+    const layers = Math.round(
+      cfg.thicknessBase +
+      depth * cfg.thicknessPerDepth
+    );
 
     const parts = [];
 
     for (let i = 1; i <= layers; i++) {
-
       const cc = darken(c, 1 - i * 0.022);
 
       parts.push(
@@ -275,227 +268,222 @@
   }
 
   function shadowDir(rotXDeg, rotYDeg, strength) {
+    return {
+      dx: -Math.sin(rotYDeg * Math.PI / 180) * strength,
+      dy: Math.sin(rotXDeg * Math.PI / 180) * strength
+    };
+  }
+
+  function measureOriginalWidth() {
+    return Math.max(
+      document.documentElement.scrollWidth,
+      document.body ? document.body.scrollWidth : 0,
+      window.innerWidth
+    );
+  }
+
+  function createBodyScene(originalWidth) {
+    const body = document.body;
+
+    const viewport = document.createElement("div");
+    viewport.className = "jocarsa-3d-viewport";
+
+    const scene = document.createElement("div");
+    scene.className = "jocarsa-3d-scene";
+
+    viewport.style.setProperty(
+      "--jocarsa-original-width",
+      originalWidth + "px"
+    );
+
+    scene.style.setProperty(
+      "--jocarsa-original-width",
+      originalWidth + "px"
+    );
+
+    copyPageBackground(viewport);
+
+    const nodes = Array.from(body.childNodes);
+
+    body.appendChild(viewport);
+    viewport.appendChild(scene);
+
+    nodes.forEach(node => {
+      if (node === viewport) return;
+
+      if (
+        node.nodeType === 1 &&
+        node.tagName &&
+        node.tagName.toLowerCase() === "script"
+      ) {
+        return;
+      }
+
+      scene.appendChild(node);
+    });
 
     return {
-      dx:
-        -Math.sin(
-          rotYDeg * Math.PI / 180
-        ) * strength,
+      viewport,
+      scene
+    };
+  }
 
-      dy:
-        Math.sin(
-          rotXDeg * Math.PI / 180
-        ) * strength
+  function createElementScene(scene, originalWidth) {
+    const viewport = document.createElement("div");
+    viewport.className = "jocarsa-3d-viewport";
+
+    viewport.style.setProperty(
+      "--jocarsa-original-width",
+      originalWidth + "px"
+    );
+
+    scene.style.setProperty(
+      "--jocarsa-original-width",
+      originalWidth + "px"
+    );
+
+    copyPageBackground(viewport);
+
+    const parent = scene.parentNode;
+
+    if (!parent) {
+      console.warn("Jocarsa3D: scene has no parent node");
+      return null;
+    }
+
+    parent.insertBefore(viewport, scene);
+    viewport.appendChild(scene);
+
+    scene.classList.add("jocarsa-3d-scene");
+
+    return {
+      viewport,
+      scene
     };
   }
 
   function init(options) {
+    const cfg = Object.assign({}, CONFIG, options || {});
 
-    const cfg =
-      Object.assign({}, CONFIG, options || {});
+    if (!document.body) {
+      console.warn("Jocarsa3D: document.body not ready");
+      return;
+    }
 
-    let scene =
-      document.querySelector(cfg.scene);
+    if (document.body.dataset.jocarsa3dInitialized === "1") {
+      return;
+    }
+
+    const originalWidth = measureOriginalWidth();
+
+    let scene = document.querySelector(cfg.scene);
 
     if (!scene) {
-
       console.warn(
         "Jocarsa3D: scene not found:",
         cfg.scene,
         "— falling back to body"
       );
 
-      scene =
-        document.body ||
-        document.documentElement;
+      scene = document.body;
     }
 
-    if (!scene) {
-      console.warn(
-        "Jocarsa3D: no usable scene found"
-      );
-      return;
+    let setup;
+
+    if (scene === document.body) {
+      setup = createBodyScene(originalWidth);
+      scene = setup.scene;
+    } else {
+      setup = createElementScene(scene, originalWidth);
+      if (!setup) return;
+      scene = setup.scene;
     }
 
-    if (
-      scene.dataset.jocarsa3dInitialized === "1"
-    ) {
-      return;
-    }
+    const viewport = setup.viewport;
 
-    scene.dataset.jocarsa3dInitialized = "1";
+    document.body.dataset.jocarsa3dInitialized = "1";
 
-    const pageBackground =
-      getPageBackground();
+    viewport.style.perspective = cfg.perspective + "px";
 
-    const viewport =
-      document.createElement("div");
-
-    viewport.className =
-      "jocarsa-3d-viewport";
-
-    viewport.style.perspective =
-      cfg.perspective + "px";
-
-    viewport.style.background =
-      pageBackground;
-
-    const parent = scene.parentNode;
-
-    if (!parent) {
-      console.warn(
-        "Jocarsa3D: scene has no parent node"
-      );
-      return;
-    }
-
-    parent.insertBefore(viewport, scene);
-    viewport.appendChild(scene);
-
-    scene.classList.add(
-      "jocarsa-3d-scene"
-    );
-
-    if (document.documentElement) {
-      document.documentElement.classList.add(
-        "jocarsa-3d-html"
-      );
-    }
-
-    if (document.body) {
-      document.body.classList.add(
-        "jocarsa-3d-body"
-      );
-    }
+    document.documentElement.classList.add("jocarsa-3d-html");
+    document.body.classList.add("jocarsa-3d-body");
 
     function syncOrigins() {
+      const centerY = window.scrollY + window.innerHeight / 2;
 
-      const centerY =
-        window.scrollY +
-        window.innerHeight / 2;
-
-      viewport.style.perspectiveOrigin =
-        `50% ${centerY}px`;
-
-      scene.style.transformOrigin =
-        `50% ${centerY}px`;
+      viewport.style.perspectiveOrigin = `50% ${centerY}px`;
+      scene.style.transformOrigin = `50% ${centerY}px`;
     }
 
     syncOrigins();
 
     const allBoxCandidates =
       [...scene.querySelectorAll(cfg.boxSelector)]
-      .filter(el => !el.closest(".jocarsa-3d-debug"))
-      .filter(el => el !== viewport)
-      .filter(el => el !== scene);
+        .filter(el => !el.closest(".jocarsa-3d-debug"))
+        .filter(el => el !== viewport)
+        .filter(el => el !== scene);
 
     const depthMap = new Map();
 
     allBoxCandidates.forEach(el => {
-      depthMap.set(
-        el,
-        depthOf(el, scene)
-      );
+      depthMap.set(el, depthOf(el, scene));
     });
 
-    const boxes =
-      allBoxCandidates.filter(visible);
+    const boxes = allBoxCandidates.filter(visible);
 
     const texts =
       [...scene.querySelectorAll(cfg.textSelector)]
-      .filter(visible)
-      .filter(el => !el.closest(".jocarsa-3d-debug"));
+        .filter(visible)
+        .filter(el => !el.closest(".jocarsa-3d-debug"));
 
     boxes.forEach(el => {
+      const st = getComputedStyle(el);
+      const position = st.position;
+      const manualZ = hasManualZIndex(el);
+      const numericZ = getNumericZIndex(el);
 
-      const st =
-        getComputedStyle(el);
-
-      const position =
-        st.position;
-
-      const manualZ =
-        hasManualZIndex(el);
-
-      const numericZ =
-        getNumericZIndex(el);
-
-      el.classList.add(
-        "jocarsa-3d-box"
-      );
+      el.classList.add("jocarsa-3d-box");
 
       if (position === "fixed") {
-        el.classList.add(
-          "jocarsa-3d-fixed"
-        );
+        el.classList.add("jocarsa-3d-fixed");
       }
 
       if (position === "sticky") {
-        el.classList.add(
-          "jocarsa-3d-sticky"
-        );
+        el.classList.add("jocarsa-3d-sticky");
       }
 
       if (manualZ) {
-        el.classList.add(
-          "jocarsa-3d-manual-z"
-        );
+        el.classList.add("jocarsa-3d-manual-z");
       }
 
-      const domDepth =
-        depthMap.get(el) || 0;
+      const domDepth = depthMap.get(el) || 0;
 
-      let z =
-        Math.min(
-          domDepth * cfg.depthStep,
-          cfg.maxDepth
-        );
+      let z = Math.min(
+        domDepth * cfg.depthStep,
+        cfg.maxDepth
+      );
 
       if (position === "fixed") {
-
         z =
           cfg.fixedZ +
-          Math.max(
-            0,
-            numericZ *
-            cfg.zIndexMultiplier
-          );
-
-      } else if (
-        position === "sticky"
-      ) {
-
+          Math.max(0, numericZ * cfg.zIndexMultiplier);
+      } else if (position === "sticky") {
         z =
           cfg.stickyZ +
-          Math.max(
-            0,
-            numericZ *
-            cfg.zIndexMultiplier
-          );
-
-      } else if (
-        manualZ &&
-        numericZ > 0
-      ) {
-
+          Math.max(0, numericZ * cfg.zIndexMultiplier);
+      } else if (manualZ && numericZ > 0) {
         z += Math.min(
           180,
-          numericZ *
-          cfg.zIndexMultiplier
+          numericZ * cfg.zIndexMultiplier
         );
       }
 
-      const bg =
-        ownBackground(el);
+      const bg = ownBackground(el);
 
-      el.dataset.jocarsaDepth =
-        domDepth;
-
-      el.dataset.jocarsaTransparent =
-        bg.transparent ? "1" : "0";
+      el.dataset.jocarsaDepth = domDepth;
+      el.dataset.jocarsaTransparent = bg.transparent ? "1" : "0";
 
       if (!bg.transparent) {
-
         el.dataset.jocarsaR = bg.c.r;
         el.dataset.jocarsaG = bg.c.g;
         el.dataset.jocarsaB = bg.c.b;
@@ -508,28 +496,19 @@
         manualZ;
 
       if (shouldLift) {
+        el.classList.add("jocarsa-3d-zbox");
 
-        el.classList.add(
-          "jocarsa-3d-zbox"
-        );
-
-        const originalTransform =
-          el.style.transform || "";
+        const originalTransform = el.style.transform || "";
 
         el.style.transform =
-          (originalTransform
-            ? originalTransform + " "
-            : "") +
+          (originalTransform ? originalTransform + " " : "") +
           `translateZ(${z}px)`;
       }
 
       if (cfg.debug && shouldLift) {
+        const label = document.createElement("span");
 
-        const label =
-          document.createElement("span");
-
-        label.className =
-          "jocarsa-3d-debug";
+        label.className = "jocarsa-3d-debug";
 
         label.textContent =
           `Z ${Math.round(z)} ` +
@@ -542,51 +521,26 @@
     });
 
     texts.forEach(el => {
-      el.classList.add(
-        "jocarsa-3d-text"
-      );
+      el.classList.add("jocarsa-3d-text");
     });
 
     let rafId = null;
 
-    let lastCX =
-      window.innerWidth / 2;
-
-    let lastCY =
-      window.innerHeight / 2;
+    let lastCX = window.innerWidth / 2;
+    let lastCY = window.innerHeight / 2;
 
     function applyFrame() {
-
       rafId = null;
 
-      const nx =
-        lastCX /
-        window.innerWidth -
-        0.5;
+      const nx = lastCX / window.innerWidth - 0.5;
+      const ny = lastCY / window.innerHeight - 0.5;
 
-      const ny =
-        lastCY /
-        window.innerHeight -
-        0.5;
-
-      const rotY =
-        nx *
-        cfg.rotationStrength;
-
-      const rotX =
-        -ny *
-        cfg.rotationStrength;
+      const rotY = nx * cfg.rotationStrength;
+      const rotX = -ny * cfg.rotationStrength;
 
       const fitScale =
         cfg.autoFitWidth
-          ? (
-              (
-                cfg.perspective -
-                cfg.cameraZ
-              ) /
-              cfg.perspective
-            ) *
-            cfg.scale
+          ? ((cfg.perspective - cfg.cameraZ) / cfg.perspective) * cfg.scale
           : cfg.scale;
 
       scene.style.transform =
@@ -596,15 +550,10 @@
         `rotateY(${rotY}deg)`;
 
       const { dx, dy } =
-        shadowDir(
-          rotX,
-          rotY,
-          cfg.directionStrength
-        );
+        shadowDir(rotX, rotY, cfg.directionStrength);
 
       const bandTop =
-        window.scrollY -
-        cfg.shadowCullMargin;
+        window.scrollY - cfg.shadowCullMargin;
 
       const bandBottom =
         window.scrollY +
@@ -612,130 +561,66 @@
         cfg.shadowCullMargin;
 
       boxes.forEach(el => {
-
-        if (
-          el.dataset
-            .jocarsaTransparent === "1"
-        ) {
-
+        if (el.dataset.jocarsaTransparent === "1") {
           el.style.boxShadow = "";
           return;
         }
 
-        const rect =
-          el.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
 
-        const docTop =
-          rect.top +
-          window.scrollY;
+        const docTop = rect.top + window.scrollY;
+        const docBottom = rect.bottom + window.scrollY;
 
-        const docBottom =
-          rect.bottom +
-          window.scrollY;
-
-        if (
-          docBottom < bandTop ||
-          docTop > bandBottom
-        ) {
+        if (docBottom < bandTop || docTop > bandBottom) {
           return;
         }
 
-        const depth =
-          +(el.dataset.jocarsaDepth || 0);
+        const depth = +(el.dataset.jocarsaDepth || 0);
 
         const c = {
-          r:
-            +(el.dataset.jocarsaR || 160),
-
-          g:
-            +(el.dataset.jocarsaG || 160),
-
-          b:
-            +(el.dataset.jocarsaB || 160)
+          r: +(el.dataset.jocarsaR || 160),
+          g: +(el.dataset.jocarsaG || 160),
+          b: +(el.dataset.jocarsaB || 160)
         };
 
         el.style.boxShadow =
-          buildBoxShadow(
-            depth,
-            c,
-            dx,
-            dy,
-            cfg
-          );
+          buildBoxShadow(depth, c, dx, dy, cfg);
       });
 
-      const textShadow =
-        buildTextShadow(
-          dx,
-          dy,
-          cfg
-        );
+      const textShadow = buildTextShadow(dx, dy, cfg);
 
       texts.forEach(el => {
+        const rect = el.getBoundingClientRect();
 
-        const rect =
-          el.getBoundingClientRect();
+        const docTop = rect.top + window.scrollY;
+        const docBottom = rect.bottom + window.scrollY;
 
-        const docTop =
-          rect.top +
-          window.scrollY;
-
-        const docBottom =
-          rect.bottom +
-          window.scrollY;
-
-        if (
-          docBottom < bandTop ||
-          docTop > bandBottom
-        ) {
+        if (docBottom < bandTop || docTop > bandBottom) {
           return;
         }
 
-        el.style.textShadow =
-          textShadow;
+        el.style.textShadow = textShadow;
       });
     }
 
-    function scheduleFrame(
-      clientX,
-      clientY
-    ) {
-
-      if (clientX !== undefined) {
-        lastCX = clientX;
-      }
-
-      if (clientY !== undefined) {
-        lastCY = clientY;
-      }
+    function scheduleFrame(clientX, clientY) {
+      if (clientX !== undefined) lastCX = clientX;
+      if (clientY !== undefined) lastCY = clientY;
 
       if (rafId) return;
 
-      rafId =
-        requestAnimationFrame(
-          applyFrame
-        );
+      rafId = requestAnimationFrame(applyFrame);
     }
 
-    document.addEventListener(
-      "mousemove",
-      e => {
-        scheduleFrame(
-          e.clientX,
-          e.clientY
-        );
-      }
-    );
+    document.addEventListener("mousemove", e => {
+      scheduleFrame(e.clientX, e.clientY);
+    });
 
     if (cfg.touchEnabled) {
-
       document.addEventListener(
         "touchmove",
         e => {
-
-          if (!e.touches.length) {
-            return;
-          }
+          if (!e.touches.length) return;
 
           e.preventDefault();
 
@@ -743,7 +628,6 @@
             e.touches[0].clientX,
             e.touches[0].clientY
           );
-
         },
         { passive: false }
       );
@@ -751,16 +635,12 @@
       document.addEventListener(
         "touchstart",
         e => {
-
-          if (!e.touches.length) {
-            return;
-          }
+          if (!e.touches.length) return;
 
           scheduleFrame(
             e.touches[0].clientX,
             e.touches[0].clientY
           );
-
         },
         { passive: true }
       );
@@ -769,10 +649,8 @@
     window.addEventListener(
       "scroll",
       () => {
-
         syncOrigins();
         scheduleFrame();
-
       },
       { passive: true }
     );
@@ -780,14 +658,12 @@
     window.addEventListener(
       "resize",
       () => {
-
         syncOrigins();
 
         scheduleFrame(
           window.innerWidth / 2,
           window.innerHeight / 2
         );
-
       },
       { passive: true }
     );
@@ -801,17 +677,9 @@
     init(params());
   }
 
-  if (
-    document.readyState === "loading"
-  ) {
-
-    document.addEventListener(
-      "DOMContentLoaded",
-      boot
-    );
-
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
   } else {
-
     boot();
   }
 

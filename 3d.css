@@ -9,6 +9,7 @@
 .jocarsa-3d-viewport {
   position: relative;
   width: 100%;
+  min-width: var(--jocarsa-original-width, 100%);
   min-height: 100vh;
   overflow: visible;
   perspective: 900px;
@@ -17,7 +18,8 @@
 
 .jocarsa-3d-scene {
   position: relative;
-  width: 100%;
+  width: var(--jocarsa-original-width, 100%);
+  min-width: var(--jocarsa-original-width, 100%);
   min-height: 100vh;
   transform-style: preserve-3d;
   transform-origin: 50% 50%;
