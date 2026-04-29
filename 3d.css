@@ -15,6 +15,10 @@
 
 .jocarsa-3d-box{
     transform-style:preserve-3d;
+    will-change:box-shadow,text-shadow;
+}
+
+.jocarsa-3d-zbox{
     will-change:transform,box-shadow;
 }
 

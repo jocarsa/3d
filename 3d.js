@@ -9,25 +9,29 @@ const CONFIG = {
         img,button,input,textarea,select
     `,
 
+    zSelector:`
+        header,nav,main,section,article,aside,footer
+    `,
+
     textSelector:`
         h1,h2,h3,h4,h5,h6,p,span,a,label,figcaption,button,li
     `,
 
     cameraZ:-360,
     scale:0.82,
-    perspective:900,
+    perspective:850,
 
     rotationStrength:16,
 
-    depthStep:34,
-    maxDepth:360,
+    depthStep:24,
+    maxDepth:260,
 
     thicknessBase:6,
-    thicknessPerDepth:1.6,
-    thicknessStep:0.55,
+    thicknessPerDepth:1.4,
+    thicknessStep:0.5,
 
     textLayers:5,
-    textStep:0.34,
+    textStep:0.3,
 
     directionStrength:5.5,
 
@@ -182,6 +186,8 @@ function init(options = {}){
         .filter(el=>!el.closest(".jocarsa-3d-debug"))
         .filter(visible);
 
+    const zBoxes = boxes.filter(el=>el.matches(cfg.zSelector));
+
     const texts = [...scene.querySelectorAll(cfg.textSelector)]
         .filter(visible);
 
@@ -199,16 +205,14 @@ function init(options = {}){
         el.dataset.jocarsaG = c.g;
         el.dataset.jocarsaB = c.b;
 
-        /*
-            No se toca display.
-            No se envuelve contenido.
-            No se modifica overflow.
-            No se cambia width.
-        */
-        el.style.transform =
-            (el.style.transform || "") + ` translateZ(${z}px)`;
+        if(el.matches(cfg.zSelector)){
+            el.classList.add("jocarsa-3d-zbox");
+            el.dataset.jocarsaOriginalTransform = el.style.transform || "";
+            el.style.transform =
+                `${el.dataset.jocarsaOriginalTransform} translateZ(${z}px)`;
+        }
 
-        if(cfg.debug){
+        if(cfg.debug && el.matches(cfg.zSelector)){
             const label = document.createElement("span");
             label.className = "jocarsa-3d-debug";
             label.textContent = `Z ${z}px`;
@@ -235,10 +239,6 @@ function init(options = {}){
             rotateY(${rotY}deg)
         `;
 
-        /*
-            Volumen ligado a la rotación.
-            No es una sombra fija ortográfica.
-        */
         const dx =
             -Math.sin(rotY * Math.PI / 180) *
             cfg.directionStrength;
