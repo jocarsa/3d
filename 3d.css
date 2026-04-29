@@ -1,0 +1,56 @@
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    overflow:hidden;
+    perspective:1200px;
+    perspective-origin:center center;
+}
+
+.jocarsa-3d-scene{
+    width:100vw;
+    min-height:100vh;
+    transform-style:preserve-3d;
+    will-change:transform;
+}
+
+.jocarsa-3d-element{
+    position:relative;
+    transform-style:preserve-3d;
+    will-change:transform, box-shadow, text-shadow;
+}
+
+.jocarsa-3d-content{
+    position:relative;
+    z-index:2;
+    transform-style:preserve-3d;
+    max-width:100%;
+}
+
+.jocarsa-3d-debug{
+    position:absolute;
+    top:6px;
+    right:6px;
+    z-index:9999;
+    background:rgba(0,0,0,.35);
+    color:white;
+    padding:4px 7px;
+    border-radius:6px;
+    font:11px monospace;
+    pointer-events:none;
+}
+
+img.jocarsa-3d-element{
+    display:block;
+    max-width:100%;
+}
+
+input,
+textarea,
+select,
+button{
+    font:inherit;
+}

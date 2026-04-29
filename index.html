@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Demo Jocarsa 3D</title>
+
+<link rel="stylesheet" href="https://jocarsa.github.io/3d/3d.css">
+
+<style>
+body{
+    font-family:Arial,sans-serif;
+    background:radial-gradient(circle at top,#ffffff,#dbeafe);
+    color:#1f2937;
+}
+
+#demo{
+    padding:50px;
+}
+
+header,
+main,
+section,
+article,
+aside,
+footer,
+.card,
+.panel{
+    border-radius:22px;
+    padding:24px;
+    margin:22px;
+}
+
+header{
+    background:#4f46e5;
+    color:white;
+}
+
+main{
+    background:#2563eb;
+    color:white;
+}
+
+section{
+    background:#10b981;
+    color:white;
+}
+
+article{
+    background:#f97316;
+    color:white;
+}
+
+aside{
+    background:#ec4899;
+    color:white;
+}
+
+footer{
+    background:#334155;
+    color:white;
+}
+
+.card{
+    background:#ffffff;
+    color:#111827;
+}
+
+.panel{
+    background:#facc15;
+    color:#111827;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+}
+
+img{
+    border-radius:18px;
+}
+
+button,
+input,
+textarea{
+    width:100%;
+    padding:14px;
+    border-radius:14px;
+    border:none;
+    margin-top:10px;
+}
+
+button{
+    background:#111827;
+    color:white;
+    cursor:pointer;
+}
+
+input,
+textarea{
+    background:white;
+    color:#111827;
+}
+
+a{
+    color:white;
+    font-weight:bold;
+}
+
+@media(max-width:900px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="demo">
+
+    <header>
+        <h1>Jocarsa 3D</h1>
+        <p>
+            Librería experimental para convertir una web normal en una
+            interfaz con parallax, profundidad y volumen visual.
+        </p>
+        <nav>
+            <a href="#">Inicio</a> |
+            <a href="#">Servicios</a> |
+            <a href="#">Contacto</a>
+        </nav>
+    </header>
+
+    <main>
+
+        <section>
+            <h2>Contenedores</h2>
+            <p>
+                Cada elemento recibe profundidad según su nivel natural
+                dentro del documento.
+            </p>
+
+            <div class="grid">
+
+                <article>
+                    <h3>Clientes</h3>
+                    <p>Gestión visual de fichas, contactos y actividad.</p>
+                    <button>Ver clientes</button>
+                </article>
+
+                <article>
+                    <h3>Facturación</h3>
+                    <p>Panel de ingresos, pagos, recibos y documentos.</p>
+                    <button>Ver facturas</button>
+                </article>
+
+                <article>
+                    <h3>Proyectos</h3>
+                    <p>Seguimiento de tareas, estados y entregas.</p>
+                    <button>Ver proyectos</button>
+                </article>
+
+            </div>
+        </section>
+
+        <section>
+            <h2>Imágenes</h2>
+
+            <div class="grid">
+                <div class="card">
+                    <img src="https://picsum.photos/400/220?1" alt="Imagen de ejemplo">
+                    <h3>Imagen con profundidad</h3>
+                    <p>También recibe volumen y sombra dinámica.</p>
+                </div>
+
+                <div class="card">
+                    <img src="https://picsum.photos/400/220?2" alt="Imagen de ejemplo">
+                    <h3>Tarjeta completa</h3>
+                    <p>La tarjeta, la imagen y el texto se procesan.</p>
+                </div>
+
+                <div class="card">
+                    <img src="https://picsum.photos/400/220?3" alt="Imagen de ejemplo">
+                    <h3>Elemento mixto</h3>
+                    <p>Contenedor, imagen, título y párrafo.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Formulario</h2>
+
+            <form class="panel">
+                <label>Nombre</label>
+                <input type="text" placeholder="Nombre del cliente">
+
+                <label>Mensaje</label>
+                <textarea placeholder="Escribe un mensaje"></textarea>
+
+                <button type="button">Enviar</button>
+            </form>
+        </section>
+
+        <aside>
+            <h2>Lista lateral</h2>
+            <ul>
+                <li>Elemento de lista uno</li>
+                <li>Elemento de lista dos</li>
+                <li>Elemento de lista tres</li>
+            </ul>
+        </aside>
+
+    </main>
+
+    <footer>
+        <p>Demo de Jocarsa 3D</p>
+    </footer>
+
+</div>
+
+<script src="https://jocarsa.github.io/3d/3d.js"></script>
+
+<script>
+Jocarsa3D({
+    sceneSelector:"#demo",
+
+    cameraZ:-620,
+    scale:0.62,
+
+    rotationStrength:16,
+
+    depthStep:24,
+    maxDepth:320,
+
+    thicknessBase:5,
+    thicknessPerDepth:0.9,
+    thicknessStep:0.55,
+
+    textLayers:5,
+    textStep:0.34,
+
+    directionStrength:5.5,
+
+    debug:true
+});
+</script>
+
+</body>
+</html>
