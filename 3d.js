@@ -1,77 +1,95 @@
 (function(){
 
-    const DEFAULT_CONFIG = {
-        sceneSelector: "body",
+    const CONFIG = {
+        scene: "body",
 
-        selector: `
+        boxSelector: `
             header, nav, main, section, article, aside, footer,
-            div, img, h1, h2, h3, h4, h5, h6, p, span,
-            ul, ol, li, a, button, input, textarea, select,
-            form, label, figure, figcaption, blockquote
+            div, form, figure, blockquote, ul, ol, li,
+            img, button, input, textarea, select
         `,
 
-        ignoreSelector: `
-            script, style, link, meta, title, br, svg,
-            .jocarsa-3d-debug
+        textSelector: `
+            h1,h2,h3,h4,h5,h6,p,span,a,label,figcaption,button,li
         `,
 
         cameraZ: -520,
-        scale: 0.68,
+        scale: 0.66,
 
-        rotationStrength: 14,
+        rotationStrength: 15,
 
-        depthStep: 22,
-        maxDepth: 280,
+        depthStep: 42,
+        contentDepth: 24,
+        maxDepth: 420,
 
-        contentDepth: 10,
+        thicknessBase: 9,
+        thicknessPerDepth: 3,
+        thicknessStep: 0.9,
 
-        thicknessBase: 5,
-        thicknessPerDepth: 0.8,
-        thicknessStep: 0.55,
+        textLayers: 7,
+        textStep: 0.42,
 
-        textLayers: 5,
-        textStep: 0.32,
+        directionStrength: 5.5,
 
-        directionStrength: 5,
-
-        debug: true
+        debug: false
     };
 
-    function rgbFromCss(color){
-        const values = color.match(/\d+/g);
+    function getScriptParams(){
+        const script = document.currentScript;
+        if(!script) return {};
 
-        if(!values){
-            return { r:180, g:180, b:180 };
+        const url = new URL(script.src);
+        const params = {};
+
+        url.searchParams.forEach((value,key)=>{
+            if(value === "true") params[key] = true;
+            else if(value === "false") params[key] = false;
+            else if(!isNaN(value)) params[key] = Number(value);
+            else params[key] = value;
+        });
+
+        return params;
+    }
+
+    function rgbFromCss(color){
+        const v = color.match(/\d+/g);
+
+        if(!v){
+            return {r:180,g:180,b:180};
         }
 
         return {
-            r:Number(values[0]),
-            g:Number(values[1]),
-            b:Number(values[2])
+            r:Number(v[0]),
+            g:Number(v[1]),
+            b:Number(v[2])
         };
     }
 
-    function darken(rgb, factor){
+    function darken(rgb,f){
         return {
-            r:Math.max(0, Math.round(rgb.r * factor)),
-            g:Math.max(0, Math.round(rgb.g * factor)),
-            b:Math.max(0, Math.round(rgb.b * factor))
+            r:Math.max(0,Math.round(rgb.r*f)),
+            g:Math.max(0,Math.round(rgb.g*f)),
+            b:Math.max(0,Math.round(rgb.b*f))
         };
     }
 
-    function isTextElement(el){
-        return [
-            "H1","H2","H3","H4","H5","H6",
-            "P","SPAN","A","LI","LABEL","BUTTON"
-        ].includes(el.tagName);
+    function getBaseColor(el){
+        const st = getComputedStyle(el);
+        let color = st.backgroundColor;
+
+        if(color === "rgba(0, 0, 0, 0)" || color === "transparent"){
+            color = st.color;
+        }
+
+        return rgbFromCss(color);
     }
 
-    function hasVisibleBox(el){
-        const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
+    function isVisible(el){
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
     }
 
-    function naturalDepth(el, root){
+    function depthOf(el,root){
         let depth = 0;
         let current = el.parentElement;
 
@@ -83,31 +101,17 @@
         return depth;
     }
 
-    function getElementBaseColor(el){
-        const style = getComputedStyle(el);
+    function wrapContent(el,config){
 
-        let color = style.backgroundColor;
-
-        if(
-            color === "rgba(0, 0, 0, 0)" ||
-            color === "transparent"
-        ){
-            color = style.color;
+        if(["IMG","INPUT","TEXTAREA","SELECT","BUTTON"].includes(el.tagName)){
+            return;
         }
 
-        return rgbFromCss(color);
-    }
-
-    function createContentWrapper(el){
         if(
             el.children.length === 1 &&
             el.children[0].classList.contains("jocarsa-3d-content")
         ){
-            return el.children[0];
-        }
-
-        if(["IMG","INPUT","TEXTAREA","SELECT","BUTTON"].includes(el.tagName)){
-            return null;
+            return;
         }
 
         const wrapper = document.createElement("div");
@@ -119,10 +123,12 @@
 
         el.appendChild(wrapper);
 
-        return wrapper;
+        wrapper.style.transform =
+            `translateZ(${config.contentDepth}px)`;
     }
 
-    function applyBoxShadow(el, dirX, dirY, config){
+    function boxShadow(el,dirX,dirY,config){
+
         const depth = Number(el.dataset.jocarsaDepth || 0);
 
         const base = {
@@ -131,98 +137,93 @@
             b:Number(el.dataset.jocarsaB)
         };
 
-        const layers = Math.round(
-            config.thicknessBase + depth * config.thicknessPerDepth
-        );
+        const layers =
+            config.thicknessBase + depth * config.thicknessPerDepth;
 
         const shadows = [];
 
-        for(let i = 1; i <= layers; i++){
-            const color = darken(base, 1 - i * 0.025);
+        for(let i=1;i<=layers;i++){
+            const c = darken(base,1 - i * 0.025);
 
             shadows.push(`
                 ${dirX * i * config.thicknessStep}px
                 ${dirY * i * config.thicknessStep}px
                 0
-                rgb(${color.r},${color.g},${color.b})
+                rgb(${c.r},${c.g},${c.b})
             `);
         }
 
         shadows.push(`
             ${dirX * layers * config.thicknessStep}px
             ${dirY * layers * config.thicknessStep}px
-            14px
-            rgba(0,0,0,.14)
+            16px
+            rgba(0,0,0,.16)
         `);
 
         el.style.boxShadow = shadows.join(",");
     }
 
-    function applyTextShadow(el, dirX, dirY, config){
+    function textShadow(el,dirX,dirY,config){
+
         const shadows = [];
 
-        for(let i = 1; i <= config.textLayers; i++){
+        for(let i=1;i<=config.textLayers;i++){
             shadows.push(`
                 ${dirX * i * config.textStep}px
                 ${dirY * i * config.textStep}px
                 0
-                rgba(0,0,0,${0.32 - i * 0.035})
+                rgba(0,0,0,${0.36 - i * 0.035})
             `);
         }
 
         shadows.push(`
-            ${dirX * 2}px
-            ${dirY * 2}px
-            6px
-            rgba(0,0,0,.18)
+            ${dirX * 3}px
+            ${dirY * 3}px
+            8px
+            rgba(0,0,0,.20)
         `);
 
         el.style.textShadow = shadows.join(",");
     }
 
-    window.Jocarsa3D = function(options = {}){
+    function init(options = {}){
 
         const config = {
-            ...DEFAULT_CONFIG,
+            ...CONFIG,
             ...options
         };
 
-        const root = document.querySelector(config.sceneSelector);
+        const root = document.querySelector(config.scene);
 
         if(!root){
-            console.warn("Jocarsa3D: no se ha encontrado la escena.");
+            console.warn("Jocarsa3D: escena no encontrada:",config.scene);
             return;
         }
 
         root.classList.add("jocarsa-3d-scene");
 
-        const elements = [...root.querySelectorAll(config.selector)]
-            .filter(el => !el.matches(config.ignoreSelector))
+        const boxes = [...root.querySelectorAll(config.boxSelector)]
+            .filter(el => !el.classList.contains("jocarsa-3d-debug"))
             .filter(el => !el.closest(".jocarsa-3d-debug"))
-            .filter(hasVisibleBox);
+            .filter(isVisible);
 
-        elements.forEach(el => {
+        boxes.forEach(el=>{
 
-            el.classList.add("jocarsa-3d-element");
+            el.classList.add("jocarsa-3d-box");
 
-            const depth = naturalDepth(el, root);
-            const z = Math.min(depth * config.depthStep, config.maxDepth);
-            const baseColor = getElementBaseColor(el);
+            const depth = depthOf(el,root);
+            const z = Math.min(depth * config.depthStep,config.maxDepth);
+            const color = getBaseColor(el);
 
             el.dataset.jocarsaDepth = depth;
             el.dataset.jocarsaZ = z;
-            el.dataset.jocarsaR = baseColor.r;
-            el.dataset.jocarsaG = baseColor.g;
-            el.dataset.jocarsaB = baseColor.b;
+            el.dataset.jocarsaR = color.r;
+            el.dataset.jocarsaG = color.g;
+            el.dataset.jocarsaB = color.b;
 
             el.style.transform = `translateZ(${z}px)`;
 
-            const wrapper = createContentWrapper(el);
-
-            if(wrapper){
-                wrapper.style.transform =
-                    `translateZ(${config.contentDepth}px)`;
-            }
+            wrapContent(el,config);
 
             if(config.debug){
                 const label = document.createElement("div");
@@ -232,7 +233,15 @@
             }
         });
 
+        const texts = [...root.querySelectorAll(config.textSelector)]
+            .filter(isVisible);
+
+        texts.forEach(el=>{
+            el.classList.add("jocarsa-3d-text");
+        });
+
         function update(e){
+
             const x = e.clientX / innerWidth - 0.5;
             const y = e.clientY / innerHeight - 0.5;
 
@@ -254,26 +263,22 @@
                 Math.sin(rotX * Math.PI / 180) *
                 config.directionStrength;
 
-            elements.forEach(el => {
-                applyBoxShadow(el, dirX, dirY, config);
-
-                if(isTextElement(el)){
-                    applyTextShadow(el, dirX, dirY, config);
-                }
-            });
+            boxes.forEach(el=>boxShadow(el,dirX,dirY,config));
+            texts.forEach(el=>textShadow(el,dirX,dirY,config));
         }
 
-        document.addEventListener("mousemove", update);
+        document.addEventListener("mousemove",update);
 
         update({
-            clientX:innerWidth / 2,
-            clientY:innerHeight / 2
+            clientX:innerWidth/2,
+            clientY:innerHeight/2
         });
+    }
 
-        return {
-            elements,
-            update
-        };
-    };
+    window.Jocarsa3D = init;
+
+    document.addEventListener("DOMContentLoaded",()=>{
+        init(getScriptParams());
+    });
 
 })();
